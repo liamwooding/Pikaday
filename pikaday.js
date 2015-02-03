@@ -219,6 +219,9 @@
         minMonth: undefined,
         maxMonth: undefined,
 
+        // allow selection of multiple dates
+        multiple: false,
+
         isRTL: false,
 
         // Additional text to append to the year in the calendar title
@@ -243,7 +246,8 @@
             nextMonth     : 'Next Month',
             months        : ['January','February','March','April','May','June','July','August','September','October','November','December'],
             weekdays      : ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-            weekdaysShort : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+            weekdaysShort : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+            daysSelected  : 'days selected'
         },
 
         // callback function
@@ -404,14 +408,18 @@
 
             if (!(hasClass(target, 'is-disabled') || hasClass(target.parentElement, 'is-disabled'))) {
                 if (hasClass(target, 'pika-button') && !hasClass(target, 'is-empty')) {
-                    self.setDate(new Date(target.getAttribute('data-pika-year'), target.getAttribute('data-pika-month'), target.getAttribute('data-pika-day')));
-                    if (opts.bound) {
-                        sto(function() {
-                            self.hide();
-                            if (opts.field) {
-                                opts.field.blur();
-                            }
-                        }, 100);
+                    if (opts.multiple) {
+                        self.toggleDate(new Date(target.getAttribute('data-pika-year'), target.getAttribute('data-pika-month'), target.getAttribute('data-pika-day')));
+                    } else {
+                        self.setDate(new Date(target.getAttribute('data-pika-year'), target.getAttribute('data-pika-month'), target.getAttribute('data-pika-day')));
+                        if (opts.bound) {
+                            sto(function() {
+                                self.hide();
+                                if (opts.field) {
+                                    opts.field.blur();
+                                }
+                            }, 100);
+                        }
                     }
                     return;
                 }
@@ -644,7 +652,11 @@
          */
         toString: function(format)
         {
-            return !isDate(this._d) ? '' : hasMoment ? moment(this._d).format(format || this._o.format) : this._d.toDateString();
+            if (this.multiple) {
+                return this._a.toString()
+            } else {
+                return !isDate(this._d) ? '' : hasMoment ? moment(this._d).format(format || this._o.format) : this._d.toDateString();
+            }
         },
 
         /**
@@ -716,6 +728,55 @@
                 this._o.onSelect.call(this, this.getDate());
             }
         },
+
+        toggleDate: function(date)
+        {
+            if (!date) {
+                return this.draw();
+            }
+            if (typeof date === 'string') {
+                date = new Date(Date.parse(date));
+            }
+            if (!isDate(date)) {
+                return;
+            }
+
+            var min = this._o.minDate,
+                max = this._o.maxDate;
+
+            if (isDate(min) && date < min) {
+                date = min;
+            } else if (isDate(max) && date > max) {
+                date = max;
+            }
+
+            var parsedDate = setToStartOfDay(new Date(date.getTime()));
+
+            if (this._a == null) {
+                this._a = [];
+            }
+            var toggledOff = false;
+            this._a.forEach(function (d, i, arr) {
+                if (parsedDate === d) {
+                    arr.splice(i, 1);
+                }
+                toggledOff = true;
+            });
+            if (!toggledOff) {
+                this._a.push();
+                if (this._o.field) {
+                    if (this._o.field.value === '') {
+                        this._o.field.value = this.toString();
+                    } else {
+                        this._o.field.value += ',' + this.toString();
+                    }
+                }
+            }
+            if (this._o.field) {
+                this._o.field.value = this.toString();
+                fireEvent(this._o.field, 'change', { firedBy: this });
+            }
+        }
 
         /**
          * change view to a specific date
